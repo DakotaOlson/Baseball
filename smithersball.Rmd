@@ -1,0 +1,222 @@
+---
+title: "Smithersball"
+author: "Dakota Olson"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Preperation
+```{r load data, message=FALSE}
+library(tidyverse)
+pitching_91_93 <- read_csv('data/FG_Player_Pitching_1991_1993.csv')
+batting_91_93 <- read_csv('data/FG_Player_Batting_1991_1993.csv')
+```
+
+## Pitcher Analysis
+```{r clean pitching_91_93}
+# Remove pitchers who didn't pitch a complete game between 1991 and 1993.
+pitching_91_93 <- subset(pitching_91_93, CG != 0)
+pitching_91_93
+```
+
+### Modify fWAR and RA9-WAR to be Rate Statistics
+```{r calculate fWAR/200 IP and RA9-WAR/200 IP}
+pitching_91_93 %>%
+  mutate('fWAR/200 IP' = round(200 * fWAR / IP, digits=1)) -> pitching_91_93
+  
+pitching_91_93 %>%
+  mutate('RA9-WAR/200 IP' = round(200 * pitching_91_93$'RA9-WAR' / IP, digits=1)) -> pitching_91_93
+
+summary(pitching_91_93)
+```
+
+### Top ERA- Performers
+```{r ERA-}
+pitching_91_93 %>%
+  arrange(pitching_91_93$'ERA-') %>%
+  head(n=10)
+```
+
+### Top FIP- Performers
+```{r FIP-}
+pitching_91_93 %>%
+  arrange(pitching_91_93$'FIP-') %>%
+  head(n=10)
+```
+
+### Top fWAR/200 IP Performers
+```{r fWAR/200 IP}
+pitching_91_93 %>%
+  arrange(-pitching_91_93$'fWAR/200 IP') %>%
+  head(n=10)
+```
+
+### Top RA9-WAR/200 IP Performers
+```{r RA9-WAR/200 IP}
+pitching_91_93 %>%
+  arrange(-pitching_91_93$'RA9-WAR/200 IP') %>%
+  head(n=10)
+```
+
+### Pitcher Comparisons
+```{r}
+top_pitchers <- c('Jose Rijo', 'Kevin Appier', 'Greg Maddux', 'Bill Swift', 'Juan Guzman')
+subset(pitching_91_93, Name %in% top_pitchers)
+```
+
+```{r Maddux vs Rijo vs Appier}
+top_pitchers2 <- c('Jose Rijo', 'Kevin Appier', 'Greg Maddux')
+subset(pitching_91_93, Name %in% top_pitchers2)
+```
+
+```{r Rijo vs Clemens}
+top_pitchers3 <- c('Jose Rijo', 'Roger Clemens')
+subset(pitching_91_93, Name %in% top_pitchers3)
+```
+
+## Batter Analysis
+### Estimated wOBA Skill (Regression Towards Mean) 
+```{r}
+mean_wOBA <- sum(batting_91_93$PA * batting_91_93$wOBA / sum(batting_91_93$PA))
+mean_wOBA
+```
+
+```{r}
+var_wOBA <- sum((batting_91_93$PA/sum(batting_91_93$PA)) * (batting_91_93$wOBA - mean_wOBA) ^ 2)
+var_wOBA
+```
+
+```{r ewOBA and fWAR/600 PA}
+batting_91_93 %>%
+  mutate('ewOBA' = round(mean_wOBA + (PA / (PA + (0.25 / var_wOBA))) * (wOBA - mean_wOBA), digits=3)) -> batting_91_93
+
+batting_91_93 %>%
+  mutate('fWAR/600 PA' = round(600 * fWAR / PA, digits=1)) -> batting_91_93
+# Note: fWAR includes defensive production so fWAR per PA isn't necessarily the best metric, but this is just for simple analysis.
+
+summary(batting_91_93)
+```
+
+```{r}
+library(skimr)
+skim(batting_91_93)
+```
+
+```{r}
+wOBA_comp <- batting_91_93[, c('Name', 'PA', 'wOBA', 'ewOBA')]
+
+wOBA_comp <- unique(wOBA_comp)
+
+wOBA_comp %>%
+  mutate('delta wOBA' = ewOBA - wOBA) -> wOBA_comp
+  
+wOBA_comp %>%
+  arrange(wOBA_comp$'delta wOBA') %>%
+  head(n=10)
+
+wOBA_comp %>%
+  arrange(-wOBA_comp$'delta wOBA') %>%
+  head(n=10)
+```
+
+### Top ewOBA Performers
+```{r ewOBA}
+batting_91_93 %>%
+  arrange(-ewOBA) %>%
+  head(n=30)
+```
+
+### Top wRC+ Performers
+```{r wRC+}
+batting_91_93 %>%
+  arrange(-batting_91_93$'wRC+') %>%
+  head(n=30)
+```
+
+### Top fWAR/600 PA Performers
+```{r fWAR/600 PA}
+batting_91_93 %>%
+  arrange(-batting_91_93$'fWAR/600 PA') %>%
+  head(n=60)
+```
+
+### Top RF - The Danny Tartabull Emergency
+```{r}
+pos_of <- c('LF', 'CF', 'RF', 'OF')
+best_of <- subset(batting_91_93, Position %in% pos_of) 
+
+best_of %>%
+  arrange(-best_of$'fWAR/600 PA') %>%
+  head(n=20)
+```
+
+```{r}
+rf_options <- c('Danny Tartabull', 'Juan Gonzalez', 'Kevin Mitchell', 'Bobby Bonilla', 'Albert Belle', 'Tim Salmon', 'David Justice', 'Shane Mack')
+rf_tib <- subset(batting_91_93, Name %in% rf_options & Position %in% c('LF', 'RF'))
+
+rf_tib %>%
+  arrange(-rf_tib$'fWAR/600 PA') %>%
+  head(n=11)
+```
+
+```{r}
+rf_options2 <- c('Danny Tartabull', 'David Justice')
+subset(batting_91_93, Name %in% rf_options2)
+```
+
+### Top CF
+```{r}
+pos_cf <- c('CF')
+best_cf <- subset(batting_91_93, Position %in% pos_cf) 
+
+best_cf %>%
+  arrange(-best_cf$'ewOBA') %>%
+  head(n=10)
+```
+
+### Top IF
+```{r}
+pos_if <- c('2B', '3B', 'SS')
+best_if <- subset(batting_91_93, Position %in% pos_if) 
+
+best_if %>%
+  arrange(-best_if$'ewOBA') %>%
+  head(n=10)
+```
+
+### Top C
+```{r}
+pos_c <- c('C')
+best_c <- subset(batting_91_93, Position %in% pos_c) 
+
+best_c %>%
+  arrange(-best_c$'ewOBA') %>%
+  head(n=10)
+```
+
+### The Team
+```{r}
+squad_names <- c('Chris Hoiles', 'Frank Thomas', 'Lou Whitaker', 'Barry Larkin', 'Edgar Martinez', 'Barry Bonds', 'Lenny Dykstra', 'Danny Tartabull')
+the_squad <- subset(batting_91_93, Name %in% squad_names)
+
+the_squad
+```
+
+```{r}
+sum(the_squad$PA * the_squad$wOBA / sum(the_squad$PA))
+sum(the_squad$PA * the_squad$ewOBA / sum(the_squad$PA))
+sum(the_squad$PA * the_squad$'wRC+' / sum(the_squad$PA))
+sum(the_squad$PA * the_squad$'fWAR/600 PA' / sum(the_squad$PA))
+```
+
+### Smithers Team
+```{r}
+the_smiths <- c('Mike Scioscia', 'Don Mattingly', 'Steve Sax', 'Ozzie Smith', 'Wade Boggs', 'Jose Canseco', 'Ken Griffey Jr.', 'Darryl Strawberry')
+smith_squad <- subset(batting_91_93, Name %in% the_smiths)
+
+smith_squad
+```
